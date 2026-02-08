@@ -1,7 +1,12 @@
 import pandas as pd
+import os
+import json
+import joblib
+
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, precision_recall_curve, auc
+
 
 # Load data (you will download creditcard.csv into data/raw/)
 df = pd.read_csv("data/raw/creditcard.csv")
@@ -15,6 +20,20 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 model = LogisticRegression(max_iter=1000)
 model.fit(X_train, y_train)
+
+# Ensure model directory exists
+os.makedirs("artifacts/model", exist_ok=True)
+
+joblib.dump(model, "artifacts/model/model.joblib")
+
+metadata = {
+    "threshold": 0.5,
+    "feature_columns": list(X.columns)
+}
+
+with open("artifacts/model/metadata.json", "w") as f:
+    json.dump(metadata, f, indent=2)
+
 
 y_probs = model.predict_proba(X_test)[:, 1]
 precision, recall, _ = precision_recall_curve(y_test, y_probs)
