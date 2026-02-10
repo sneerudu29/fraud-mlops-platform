@@ -12,8 +12,6 @@ df = pd.read_csv("data/raw/creditcard.csv")
 X = df.drop(columns=["Class"])
 X = X[cols]
 
-row = X.iloc[0].to_dict()   # real transaction features
-
-payload = {"features": row}
-
+rows = [X.iloc[0].to_dict(), X.iloc[1].to_dict()] #  real transaction features
+payload = {"records": rows}
 print(json.dumps(payload, indent=2))
