@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Dict
+from typing import Dict, List
 import joblib
 import json
 import numpy as np
@@ -28,12 +28,13 @@ feature_columns = metadata["feature_columns"]
 class PredictRequest(BaseModel):
     features: Dict[str, float] # must be same length as feature_columns
 
-
-
 # ---- Response schema (optional, but nice) ----
 class PredictResponse(BaseModel):
     fraud_probability: float
     prediction: int
+
+class BatchPredictRequest(BaseModel):
+    records: List[Dict[str, float]]
 
 
 @app.get("/health")
@@ -43,6 +44,7 @@ def health():
 @app.get("/schema")
 def schema():
     return {
+        "model": "LogisticRegression",
         "threshold": threshold,
         "num_features": len(feature_columns),
         "feature_columns": feature_columns
@@ -68,3 +70,24 @@ def predict(req: PredictRequest):
     pred = int(prob >= threshold)
 
     return PredictResponse(fraud_probability=prob, prediction=pred)
+
+@app.post("/predict_batch")
+def predict_batch(req: BatchPredictRequest):
+    rows = []
+
+    for record in req.records:
+        rows.append([record[c] for c in feature_columns])
+
+    import pandas as pd
+    X = pd.DataFrame(rows, columns=feature_columns)
+
+    probs = model.predict_proba(X)[:, 1]
+    preds = (probs >= threshold).astype(int)
+
+    return {
+        "count": len(probs),
+        "results": [
+            {"fraud_probability": float(p), "prediction": int(d)}
+            for p, d in zip(probs, preds)
+        ]
+    }
