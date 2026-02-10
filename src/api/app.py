@@ -1,8 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from typing import Dict
 import joblib
 import json
 import numpy as np
+
 
 app = FastAPI(title="Fraud MLOps Platform")
 
@@ -22,8 +24,10 @@ feature_columns = metadata["feature_columns"]
 
 
 # ---- Request schema (what the API expects) ----
+
 class PredictRequest(BaseModel):
-    features: list[float]  # must be same length as feature_columns
+    features: Dict[str, float] # must be same length as feature_columns
+
 
 
 # ---- Response schema (optional, but nice) ----
@@ -36,23 +40,31 @@ class PredictResponse(BaseModel):
 def health():
     return {"status": "ok"}
 
+@app.get("/schema")
+def schema():
+    return {
+        "threshold": threshold,
+        "num_features": len(feature_columns),
+        "feature_columns": feature_columns
+    }
+
 
 @app.post("/predict", response_model=PredictResponse)
 def predict(req: PredictRequest):
-    # Validate input length
-    if len(req.features) != len(feature_columns):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Expected {len(feature_columns)} features, got {len(req.features)}"
-        )
+    missing = [c for c in feature_columns if c not in req.features]
+    extra = [k for k in req.features.keys() if k not in feature_columns]
 
-    # Convert list -> 2D array for sklearn (1 row, N columns)
-    X = np.array(req.features, dtype=float).reshape(1, -1)
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Missing features: {missing[:5]} ... total={len(missing)}")
+    if extra:
+        raise HTTPException(status_code=400, detail=f"Unexpected features: {extra[:5]} ... total={len(extra)}")
 
-    # Predict fraud probability
+    # Create a 1-row DataFrame with correct column order (fixes sklearn warning too)
+    import pandas as pd
+    X = pd.DataFrame([[req.features[c] for c in feature_columns]], columns=feature_columns)
+
+
     prob = float(model.predict_proba(X)[0, 1])
-
-    # Apply threshold
     pred = int(prob >= threshold)
 
     return PredictResponse(fraud_probability=prob, prediction=pred)
