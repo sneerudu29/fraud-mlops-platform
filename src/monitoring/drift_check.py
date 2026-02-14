@@ -5,6 +5,7 @@ from datetime import datetime
 import joblib
 import numpy as np
 import pandas as pd
+import argparse
 
 
 MODEL_PATH = "artifacts/model/model.joblib"
@@ -61,6 +62,15 @@ def load_features(csv_path: str, feature_columns: list[str]) -> pd.DataFrame:
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--reference", required=True)
+    ap.add_argument("--current", required=True)
+    ap.add_argument("--out", default="artifacts/monitoring/drift_report.json")
+    args = ap.parse_args()
+
+    REFERENCE_PATH = args.reference
+    CURRENT_PATH = args.current
+    out_path = args.out
     model, meta = load_model_and_meta()
     feature_columns = meta["feature_columns"]
     threshold = float(meta["threshold"])
@@ -113,7 +123,7 @@ def main():
         "trigger_retrain": trigger_retrain,
     }
 
-    out_path = os.path.join(REPORT_DIR, "drift_report.json")
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(report, f, indent=2)
 
