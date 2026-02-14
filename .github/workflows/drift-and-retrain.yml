@@ -32,6 +32,15 @@ jobs:
             --outfile data/sample/creditcard_current.csv \
             --amount_multiplier 50
 
+      - name: Train baseline model (creates artifacts/model)
+        run: |
+          mkdir -p artifacts/model
+          python src/training/train_model.py \
+            --data data/sample/creditcard_sample.csv \
+            --outdir artifacts/model \
+            --threshold 0.5
+
+
       - name: Run drift check
         run: |
           python src/monitoring/drift_check.py \
