@@ -152,6 +152,7 @@ Missing features: ['Amount']
 
 
 This demonstrates fail-fast schema validation.
+---
 
 ### Run with Docker
 Build
@@ -162,12 +163,15 @@ docker run --rm -p 8000:8000 \
   -v "$(pwd)/artifacts/model:/app/artifacts/model" \
   fraud-mlops-api:latest
 
+---
 
 ### Open:
 
 http://127.0.0.1:8000/docs
 
 http://127.0.0.1:8000/schema
+
+----
 
 ### CI/CD Pipeline
 
@@ -189,6 +193,8 @@ model.joblib
 
 metadata.json
 
+----
+
 ### Drift Monitoring
 
 Drift detection uses:
@@ -207,6 +213,8 @@ PSI Interpretation:
 
 0.25 → High drift
 
+---
+
 ### Training-Serving Skew Protection
 
 This project prevents silent schema mismatch by:
@@ -221,6 +229,8 @@ Rejecting requests with missing or extra features
 
 Fail-fast > Silent incorrect predictions.
 
+---
+
 ### Why PR-AUC Instead of Accuracy?
 
 Fraud detection is highly imbalanced.
@@ -232,6 +242,8 @@ PR-AUC focuses on:
 Precision (quality of fraud flags)
 
 Recall (coverage of actual fraud)
+
+---
 
 ### Tech Stack
 
@@ -250,6 +262,8 @@ Pandas
 Joblib
 
 PSI-based Drift Detection
+
+---
 
 ### Future Improvements
 
