@@ -2,11 +2,27 @@ import argparse
 import json
 from pathlib import Path
 
+import hashlib
+import subprocess
+from datetime import datetime, timezone
+
+
 import joblib
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import average_precision_score
 from sklearn.model_selection import train_test_split
+
+def get_git_commit() -> str:
+    try:
+        return subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    except Exception:
+        return "unknown"
+
+def compute_schema_hash(feature_columns: list[str]) -> str:
+    # stable hash of the schema (order matters)
+    s = "|".join(feature_columns).encode("utf-8")
+    return hashlib.sha256(s).hexdigest()
 
 
 def main():
@@ -27,7 +43,7 @@ def main():
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
-    model = LogisticRegression(max_iter=2000)
+    model = LogisticRegression(max_iter=5000, solver="lbfgs")
     model.fit(X_train, y_train)
 
     y_probs = model.predict_proba(X_test)[:, 1]
@@ -38,11 +54,21 @@ def main():
 
     joblib.dump(model, outdir / "model.joblib")
 
+    trained_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    git_commit = get_git_commit()
+    schema_hash = compute_schema_hash(feature_columns)
+
     meta = {
+        "model_version": trained_at,          # simple versioning by time
+        "trained_at": trained_at,
+        "git_commit": git_commit,
+        "num_features": len(feature_columns),
+        "schema_hash": schema_hash,
         "feature_columns": feature_columns,
         "threshold": args.threshold,
         "pr_auc": pr_auc
     }
+
     with open(outdir / "metadata.json", "w") as f:
         json.dump(meta, f, indent=2)
 
