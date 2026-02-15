@@ -4,6 +4,8 @@ from typing import Dict, List
 import joblib
 import json
 import hashlib
+import time
+from src.api.observability import record_request, log_prediction, prometheus_metrics, uptime_seconds
 
 
 
@@ -56,7 +58,13 @@ class BatchPredictRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "model_version": metadata.get("model_version"),
+        "schema_hash": metadata.get("schema_hash"),
+        "uptime_seconds": uptime_seconds(),
+    }
+
 
 @app.get("/schema")
 def schema():
@@ -73,21 +81,41 @@ def schema():
 
 @app.post("/predict", response_model=PredictResponse)
 def predict(req: PredictRequest):
-    missing = [c for c in feature_columns if c not in req.features]
-    extra = [k for k in req.features.keys() if k not in feature_columns]
+    start = time.time()
+    is_error = False
+    try:
+        missing = [c for c in feature_columns if c not in req.features]
+        extra = [k for k in req.features.keys() if k not in feature_columns]
 
-    if missing:
-        raise HTTPException(status_code=400, detail=f"Missing features: {missing[:5]} ... total={len(missing)}")
-    if extra:
-        raise HTTPException(status_code=400, detail=f"Unexpected features: {extra[:5]} ... total={len(extra)}")
+        if missing:
+            raise HTTPException(status_code=400, detail=f"Missing features: {missing[:5]} ... total={len(missing)}")
+        if extra:
+            raise HTTPException(status_code=400, detail=f"Unexpected features: {extra[:5]} ... total={len(extra)}")
 
-    import pandas as pd
-    X = pd.DataFrame([[req.features[c] for c in feature_columns]], columns=feature_columns)
+        import pandas as pd
+        X = pd.DataFrame([[req.features[c] for c in feature_columns]], columns=feature_columns)
 
-    prob = float(model.predict_proba(X)[0, 1])
-    pred = int(prob >= threshold)
+        prob = float(model.predict_proba(X)[0, 1])
+        pred = int(prob >= threshold)
 
-    return PredictResponse(fraud_probability=prob, prediction=pred)
+        # audit log
+        log_prediction({
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "model_version": metadata.get("model_version"),
+            "schema_hash": metadata.get("schema_hash"),
+            "fraud_probability": prob,
+            "prediction": pred
+        })
+
+        return PredictResponse(fraud_probability=prob, prediction=pred)
+
+    except HTTPException:
+        is_error = True
+        raise
+    finally:
+        latency_ms = (time.time() - start) * 1000
+        # pred might not exist if error
+        record_request(latency_ms=latency_ms, is_error=is_error, is_fraud=(locals().get("pred", 0) == 1))
 
 
 @app.post("/predict_batch")
@@ -118,3 +146,8 @@ def predict_batch(req: BatchPredictRequest):
             for p, d in zip(probs, preds)
         ]
     }
+    
+@app.get("/metrics")
+def metrics():
+    return prometheus_metrics()
+
