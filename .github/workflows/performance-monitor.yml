@@ -1,0 +1,50 @@
+name: Performance Monitor (Label-Based)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 12 * * 1"  # every Monday 12:00 UTC
+
+jobs:
+  performance_check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Train baseline model (needed because artifacts are not committed)
+        run: |
+          mkdir -p artifacts/model
+          python src/training/train_model.py \
+            --data data/sample/creditcard_sample.csv \
+            --outdir artifacts/model \
+            --threshold 0.5
+
+      - name: Evaluate performance (label-based)
+        run: |
+          mkdir -p artifacts/reports
+          python src/monitoring/evaluate_performance.py \
+            --data data/sample/creditcard_sample.csv \
+            --out artifacts/reports/performance_report.json \
+            --min_pr_auc 0.70 \
+            --min_recall 0.70 \
+            --min_precision 0.20
+
+      - name: Upload performance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-report
+          path: |
+            artifacts/reports/performance_report.json
