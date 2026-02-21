@@ -38,9 +38,9 @@ jobs:
           python src/monitoring/evaluate_performance.py \
             --data data/sample/creditcard_sample.csv \
             --out artifacts/reports/performance_report.json \
-            --min_pr_auc 0.70 \
-            --min_recall 0.70 \
-            --min_precision 0.20
+            --min_pr_auc 0.90 \
+            --min_recall 0.80 \
+            --min_precision 0.85
 
       - name: Upload performance report
         uses: actions/upload-artifact@v4
