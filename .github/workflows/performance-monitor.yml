@@ -31,6 +31,24 @@ jobs:
             --data data/sample/creditcard_sample.csv \
             --outdir artifacts/model \
             --threshold 0.5
+        
+      - name: Optimize threshold (cost-sensitive)
+        run: |
+          python src/training/optimize_threshold.py \
+            --data data/sample/creditcard_sample.csv \
+            --fraud_loss 500 \
+            --review_cost 10 \
+            --max_flag_rate 0.05 \
+            --min_t 0.0 \
+            --max_t 0.999 \
+            --steps 2000
+
+      - name: Threshold impact report
+        run: |
+          python src/monitoring/threshold_impact.py \
+            --data data/sample/creditcard_sample.csv \
+            --fraud_loss 500 \
+            --review_cost 10
 
       - name: Evaluate performance (label-based)
         run: |
