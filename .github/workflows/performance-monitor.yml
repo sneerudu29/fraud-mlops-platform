@@ -59,8 +59,19 @@ jobs:
             --min_pr_auc 0.90 \
             --min_recall 0.80 \
             --min_precision 0.85
+      
+      - name: Upload Stage 9 threshold artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage9-threshold-reports
+          path: |
+            reports/threshold_optimization.json
+            reports/threshold_impact.json
+            artifacts/model/metadata.json
 
       - name: Upload performance report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: performance-report
